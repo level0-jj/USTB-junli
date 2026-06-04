@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>军事理论刷题 · 顺序模式</title>
+    <title>军事理论刷题 · 查看答案版</title>
     <style>
         * { margin:0; padding:0; box-sizing:border-box; }
         body {
@@ -38,14 +38,11 @@
         }
         .controls button.secondary { background: #95a5a6; }
         .controls button.danger { background: #e74c3c; }
-        .controls button:disabled { opacity: 0.5; pointer-events: none; }
         .question-card {
             background: white; border-radius: 14px; padding: 20px; margin-bottom: 16px;
             box-shadow: 0 2px 10px rgba(0,0,0,0.06);
         }
-        .progress {
-            text-align: right; font-size: 0.85rem; color: #7f8c8d; margin-bottom: 8px;
-        }
+        .progress { text-align: right; font-size: 0.85rem; color: #7f8c8d; margin-bottom: 8px; }
         .question-type {
             display: inline-block; background: #eaf2f8; padding: 4px 12px; border-radius: 20px;
             font-size: 0.8rem; font-weight: 600; color: #2c3e50; margin-bottom: 12px;
@@ -56,24 +53,54 @@
             padding: 14px; border: 2px solid #d5d8dc; border-radius: 10px; display: flex;
             align-items: center; font-size: 1rem; background: #fafafa;
             -webkit-tap-highlight-color: transparent; user-select: none;
+            transition: background 0.2s, border-color 0.2s;
         }
         .option-item.selected { background: #d4efdf; border-color: #27ae60; }
+        .option-item.wrong { background: #fadbd8; border-color: #e74c3c; }
         .option-letter {
             font-weight: 700; font-size: 1rem; margin-right: 12px;
             width: 28px; height: 28px; border-radius: 50%; background: #d5d8dc;
             display: flex; align-items: center; justify-content: center; color: #2c3e50;
         }
-        .action-row { display: flex; gap: 10px; margin-top: 18px; }
-        .action-row button { flex: 1; padding: 14px 0; border-radius: 10px; font-size: 1rem; font-weight: 600; border: none; cursor: pointer; }
+        .action-row { display: flex; gap: 8px; margin-top: 18px; flex-wrap: wrap; }
+        .action-row button { flex: 1; min-width: 50px; padding: 12px 6px; border-radius: 10px; font-size: 0.85rem; font-weight: 600; border: none; cursor: pointer; }
+        .btn-prev { background: #95a5a6; color: white; }
         .btn-submit { background: #27ae60; color: white; }
+        .btn-show-answer { background: #e67e22; color: white; }
         .btn-next { background: #7f8c8d; color: white; }
         .result { margin-top: 14px; padding: 12px; border-radius: 8px; font-weight: 600; font-size: 0.95rem; }
         .result.correct { background: #d4efdf; color: #1e8449; }
         .result.incorrect { background: #fadbd8; color: #b03a2e; }
         .empty-state { text-align: center; padding: 40px 0; color: #95a5a6; font-size: 1rem; }
         .finish-card {
-            text-align: center; padding: 30px; background: white; border-radius: 14px; box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+            text-align: center; padding: 30px; background: white; border-radius: 14px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.06);
         }
+        .resume-prompt {
+            text-align: center; padding: 20px; background: #eaf2f8; border-radius: 10px;
+            margin-bottom: 15px;
+        }
+        .overview-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(50px, 1fr));
+            gap: 8px;
+            margin: 20px 0;
+            justify-items: center;
+        }
+        .overview-item {
+            width: 48px; height: 48px;
+            display: flex; align-items: center; justify-content: center;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 1rem;
+            border: 2px solid transparent;
+            transition: transform 0.1s;
+        }
+        .overview-item:active { transform: scale(0.95); }
+        .overview-item.unanswered { background: #e0e0e0; color: #7f8c8d; }
+        .overview-item.correct-status { background: #d4efdf; color: #1e8449; }
+        .overview-item.wrong-status { background: #fadbd8; color: #b03a2e; }
     </style>
 </head>
 <body>
@@ -90,8 +117,8 @@
         </select>
         <select id="modeFilter">
             <option value="all">所有题目</option>
-            <option value="wrong">错题重练</option>
             <option value="unanswered">未做过的</option>
+            <option value="wrong">错题重练</option>
         </select>
         <select id="countSelect">
             <option value="all">全部</option>
@@ -102,14 +129,15 @@
             <option value="custom">自定义</option>
         </select>
         <input type="number" id="customCount" placeholder="输入题数" style="display:none" min="1">
-        <button id="startBtn" onclick="startPractice()">▶️ 开始做题</button>
-        <button class="secondary" onclick="clearWrongBook()">🗑 清错题</button>
+        <button onclick="startPractice()">▶️ 开始做题</button>
+        <button class="secondary" onclick="clearAllRecords()">🗑 清记录</button>
     </div>
 
+    <div id="resumeArea"></div>
     <div id="questionContainer"></div>
 
     <script>
-        // ★★★ 题库数据（将 questions.json 的全部内容粘贴替换掉 [ ]） ★★★
+        // ★★★ 题库数据（将 questions.json 的全部内容粘贴过来替换 [ ]） ★★★
         const allQuestions = [
   {
     "id": 1,
@@ -212,10 +240,10 @@
     "type": "选择",
     "question": "我国古代国防的时间跨度是（ ）",
     "options": [
-      "A. 夏朝",
-      "B. 商朝",
-      "C. 夏朝",
-      "D. 商朝"
+      "A. 夏朝--1949",
+      "B. 商朝--1911",
+      "C. 夏朝--1840",
+      "D. 商朝--1949"
     ],
     "answer": "C"
   },
@@ -14487,124 +14515,182 @@
 ];
 
         // ========== 全局变量 ==========
-        let questionQueue = [];          // 当前轮次题目列表
-        let currentQueueIndex = 0;       // 当前做到第几题（从0开始）
-        let totalToDo = 0;               // 本轮计划做多少题
+        let questionQueue = [];
+        let currentQueueIndex = 0;
+        let totalToDo = 0;
         let currentQuestion = null;
-        let userAnswer = null;
-        let answered = false;
+        let userAnswer = null;     // 用户选择的字母字符串
+        let answered = false;      // 当前题目是否已提交/查看答案
         let lastTapTime = 0;
 
-        // ========== 错题本（localStorage） ==========
+        // 每题的状态存储：{ userAnswer, correctAnswer, isCorrect, resultHtml }
+        let questionStatus = {};
+
+        // ========== 本地存储 ==========
+        function safeGetItem(k) { try { return localStorage.getItem(k); } catch(e) { return null; } }
+        function safeSetItem(k, v) { try { localStorage.setItem(k, v); } catch(e) {} }
+        function safeRemoveItem(k) { try { localStorage.removeItem(k); } catch(e) {} }
+
         function getWrongBook() {
-            const raw = localStorage.getItem('wrongBook');
+            const raw = safeGetItem('wrongBook');
             return raw ? new Set(JSON.parse(raw)) : new Set();
         }
-        function saveWrongBook(book) {
-            localStorage.setItem('wrongBook', JSON.stringify([...book]));
+        function saveWrongBook(book) { safeSetItem('wrongBook', JSON.stringify([...book])); }
+
+        function getDoneBook() {
+            const raw = safeGetItem('doneBook');
+            return raw ? new Set(JSON.parse(raw)) : new Set();
+        }
+        function saveDoneBook(book) { safeSetItem('doneBook', JSON.stringify([...book])); }
+
+        function saveProgress() {
+            safeSetItem('currentProgress', JSON.stringify({
+                queue: questionQueue,
+                index: currentQueueIndex,
+                total: totalToDo,
+                status: questionStatus
+            }));
+        }
+        function clearProgress() { safeRemoveItem('currentProgress'); }
+        function loadProgress() {
+            const raw = safeGetItem('currentProgress');
+            if (!raw) return null;
+            try {
+                const obj = JSON.parse(raw);
+                if (obj.queue && Array.isArray(obj.queue) && typeof obj.index === 'number' && obj.total)
+                    return obj;
+            } catch(e) {}
+            return null;
         }
 
-        // ========== 统计更新 ==========
+        // ========== 统计 ==========
         function updateStats() {
             const total = allQuestions.length;
             const single = allQuestions.filter(q => q.type==='选择').length;
             const multi = allQuestions.filter(q => q.type==='多选').length;
             const judge = allQuestions.filter(q => q.type==='判断').length;
+            const doneCnt = getDoneBook().size;
             const wrongCnt = getWrongBook().size;
             document.getElementById('stats').innerHTML = `
                 <div class="stat-item"><div class="stat-number">${total}</div><div class="stat-label">总题数</div></div>
                 <div class="stat-item"><div class="stat-number">${single}</div><div class="stat-label">单选</div></div>
                 <div class="stat-item"><div class="stat-number">${multi}</div><div class="stat-label">多选</div></div>
                 <div class="stat-item"><div class="stat-number">${judge}</div><div class="stat-label">判断</div></div>
-                <div class="stat-item"><div class="stat-number">${wrongCnt}</div><div class="stat-label">错题本</div></div>
+                <div class="stat-item"><div class="stat-number">${doneCnt}</div><div class="stat-label">已做</div></div>
+                <div class="stat-item"><div class="stat-number">${wrongCnt}</div><div class="stat-label">错题</div></div>
             `;
         }
 
-        // ========== 自定义数量联动 ==========
         document.getElementById('countSelect').addEventListener('change', function() {
-            const customInput = document.getElementById('customCount');
-            if (this.value === 'custom') {
-                customInput.style.display = 'inline-block';
-                customInput.focus();
-            } else {
-                customInput.style.display = 'none';
-            }
+            document.getElementById('customCount').style.display = this.value === 'custom' ? 'inline-block' : 'none';
+            if (this.value === 'custom') document.getElementById('customCount').focus();
         });
 
-        // ========== 生成有序题目队列 ==========
+        function getQuestionById(id) {
+            return allQuestions.find(q => q.id == id);
+        }
+
+        // ========== 开始练习 ==========
         function startPractice() {
-            // 1. 获取筛选条件
+            clearProgress();
+            document.getElementById('resumeArea').innerHTML = '';
+
             const type = document.getElementById('typeFilter').value;
             const mode = document.getElementById('modeFilter').value;
+            const doneBook = getDoneBook();
             const wrongBook = getWrongBook();
 
-            // 先过滤题型
             let pool = allQuestions.filter(q => type === 'all' ? true : q.type === type);
+            if (mode === 'wrong') pool = pool.filter(q => wrongBook.has(q.id));
+            else if (mode === 'unanswered') pool = pool.filter(q => !doneBook.has(q.id));
 
-            // 再过滤模式
-            if (mode === 'wrong') {
-                pool = pool.filter(q => wrongBook.has(q.id));
-            } else if (mode === 'unanswered') {
-                pool = pool.filter(q => !wrongBook.has(q.id));
-            }
-
-            // 如果无题
             if (pool.length === 0) {
                 document.getElementById('questionContainer').innerHTML = '<div class="empty-state">📭 没有符合条件的题目</div>';
                 return;
             }
 
-            // 按 id 升序排列（顺序做题）
             pool.sort((a, b) => a.id - b.id);
-
-            // 2. 确定做题数量
             let count;
             const countSelect = document.getElementById('countSelect');
-            if (countSelect.value === 'all') {
-                count = pool.length;
-            } else if (countSelect.value === 'custom') {
-                const customVal = parseInt(document.getElementById('customCount').value, 10);
-                if (isNaN(customVal) || customVal < 1) {
-                    alert('请输入有效的题数');
-                    return;
-                }
-                count = Math.min(customVal, pool.length);
+            if (countSelect.value === 'all') count = pool.length;
+            else if (countSelect.value === 'custom') {
+                const cv = parseInt(document.getElementById('customCount').value, 10);
+                if (isNaN(cv) || cv < 1) { alert('请输入有效的题数'); return; }
+                count = Math.min(cv, pool.length);
             } else {
-                count = parseInt(countSelect.value, 10);
-                count = Math.min(count, pool.length);
+                count = Math.min(parseInt(countSelect.value, 10), pool.length);
             }
 
-            // 3. 取前 count 题作为本轮队列
-            questionQueue = pool.slice(0, count);
+            questionQueue = pool.slice(0, count).map(q => q.id);
             totalToDo = questionQueue.length;
             currentQueueIndex = 0;
             answered = false;
             userAnswer = null;
+            questionStatus = {};
 
-            // 4. 显示第一题
-            if (questionQueue.length > 0) {
-                currentQuestion = questionQueue[0];
-                renderQuestion();
-            }
+            saveProgress();
+            loadCurrentQuestion();
         }
 
-        // ========== 渲染当前题目 ==========
+        // ========== 恢复进度 ==========
+        function resumePractice(progress) {
+            document.getElementById('resumeArea').innerHTML = '';
+            questionQueue = progress.queue;
+            currentQueueIndex = progress.index;
+            totalToDo = progress.total;
+            questionStatus = progress.status || {};
+
+            const validIds = questionQueue.filter(id => getQuestionById(id));
+            if (validIds.length === 0) {
+                alert('上次的进度已失效，将清除进度。');
+                clearProgress();
+                document.getElementById('questionContainer').innerHTML = '<div class="empty-state">⬆️ 请重新选择条件并开始做题</div>';
+                return;
+            }
+            questionQueue = validIds;
+            totalToDo = validIds.length;
+            if (currentQueueIndex >= validIds.length) currentQueueIndex = 0;
+
+            loadCurrentQuestion();
+        }
+
+        function loadCurrentQuestion() {
+            const id = questionQueue[currentQueueIndex];
+            currentQuestion = getQuestionById(id);
+            if (!currentQuestion) {
+                alert('题目数据异常');
+                return;
+            }
+            const status = questionStatus[id];
+            if (status && status.isCorrect !== undefined) {
+                answered = true;
+                userAnswer = status.userAnswer || null;
+            } else {
+                answered = false;
+                userAnswer = null;
+            }
+            renderQuestion();
+        }
+
+        // ========== 渲染 ==========
         function renderQuestion() {
             if (!currentQuestion) return;
             const q = currentQuestion;
             const container = document.getElementById('questionContainer');
-
-            // 进度显示
             const progressText = `第 ${currentQueueIndex + 1} / ${totalToDo} 题`;
 
             let optionsHtml = '';
             q.options.forEach((opt, idx) => {
                 const letter = String.fromCharCode(65 + idx);
-                optionsHtml += `
-                    <div class="option-item" data-letter="${letter}">
-                        <span class="option-letter">${letter}</span>
-                        <span>${opt}</span>
-                    </div>`;
+                let cls = 'option-item';
+                if (answered && userAnswer) {
+                    if (q.type === '选择' || q.type === '判断') {
+                        if (userAnswer === letter) cls += ' selected';
+                    } else {
+                        if (userAnswer.includes(letter)) cls += ' selected';
+                    }
+                }
+                optionsHtml += `<div class="${cls}" data-letter="${letter}"><span class="option-letter">${letter}</span><span>${opt}</span></div>`;
             });
 
             container.innerHTML = `
@@ -14614,115 +14700,228 @@
                     <div class="question-text">${q.id}. ${q.question}</div>
                     <div class="options">${optionsHtml}</div>
                     <div class="action-row">
-                        <button class="btn-submit" onclick="submitAnswer()">✅ 提交答案</button>
-                        <button class="btn-next" onclick="nextQuestion()">➡️ 下一题</button>
+                        <button class="btn-prev" onclick="prevQuestion()">◀ 上一题</button>
+                        <button class="btn-submit" onclick="submitAnswer()">✅ 提交</button>
+                        <button class="btn-show-answer" onclick="showAnswer()">👁️ 答案</button>
+                        <button class="btn-next" onclick="nextQuestion()">下一题 ▶</button>
                     </div>
                     <div id="resultArea"></div>
                 </div>`;
 
-            // 绑定选项点击（带双击提交）
-            document.querySelectorAll('.option-item').forEach(el => {
-                el.addEventListener('click', function(e) {
-                    if (answered) return;
-                    const now = Date.now();
-                    const letter = this.dataset.letter;
-                    if (q.type === '选择' || q.type === '判断') {
-                        document.querySelectorAll('.option-item').forEach(opt => opt.classList.remove('selected'));
-                        this.classList.add('selected');
-                        userAnswer = letter;
-                    } else {
-                        this.classList.toggle('selected');
-                        const selectedLetters = [];
-                        document.querySelectorAll('.option-item.selected').forEach(el => selectedLetters.push(el.dataset.letter));
-                        userAnswer = selectedLetters.sort().join('');
-                    }
-                    if (now - lastTapTime < 300) {
-                        submitAnswer();
-                    }
-                    lastTapTime = now;
+            // 如果已答，显示结果并禁止操作
+            if (answered) {
+                const status = questionStatus[q.id];
+                if (status && status.resultHtml) {
+                    document.getElementById('resultArea').innerHTML = status.resultHtml;
+                }
+                document.querySelectorAll('.option-item').forEach(el => el.style.pointerEvents = 'none');
+            } else {
+                // 绑定选项点击
+                document.querySelectorAll('.option-item').forEach(el => {
+                    el.addEventListener('click', function(e) {
+                        if (answered) return;
+                        const now = Date.now();
+                        const letter = this.dataset.letter;
+                        if (q.type === '选择' || q.type === '判断') {
+                            document.querySelectorAll('.option-item').forEach(opt => opt.classList.remove('selected'));
+                            this.classList.add('selected');
+                            userAnswer = letter;
+                        } else {
+                            this.classList.toggle('selected');
+                            const sel = [];
+                            document.querySelectorAll('.option-item.selected').forEach(el => sel.push(el.dataset.letter));
+                            userAnswer = sel.sort().join('');
+                        }
+                        if (now - lastTapTime < 300) submitAnswer();
+                        lastTapTime = now;
+                    });
                 });
-            });
+            }
+        }
+
+        // ========== 上一题 ==========
+        function prevQuestion() {
+            if (currentQueueIndex > 0) {
+                saveTempState();
+                currentQueueIndex--;
+                loadCurrentQuestion();
+                saveProgress();
+            }
+        }
+
+        function nextQuestion() {
+            saveTempState();
+            currentQueueIndex++;
+            if (currentQueueIndex < totalToDo) {
+                loadCurrentQuestion();
+                saveProgress();
+            } else {
+                finishPractice();
+            }
+        }
+
+        function saveTempState() {
+            if (!currentQuestion) return;
+            const id = currentQuestion.id;
+            if (!answered && userAnswer) {
+                // 有选择但未提交，暂存但不标记对错
+                questionStatus[id] = {
+                    userAnswer: userAnswer,
+                    correctAnswer: null,
+                    isCorrect: undefined,  // 未提交，不算完成
+                    resultHtml: null
+                };
+            }
+            // 如果已答，questionStatus 早已存在，不动
         }
 
         // ========== 提交答案 ==========
         function submitAnswer() {
             if (!currentQuestion || answered) return;
-            if (!userAnswer) {
-                alert('请先选择答案');
-                return;
-            }
-            answered = true;
+            if (!userAnswer) { alert('请先选择答案'); return; }
+            finalizeAnswer(userAnswer, false);
+        }
+
+        // ========== 查看答案（算错）==========
+        function showAnswer() {
+            if (!currentQuestion || answered) return;
+            finalizeAnswer(null, true);
+        }
+
+        function finalizeAnswer(userAns, isShowAnswer) {
             const q = currentQuestion;
             const correct = q.answer;
-            const isCorrect = (userAnswer === correct);
-            const resultArea = document.getElementById('resultArea');
-            const wrongBook = getWrongBook();
+            let isCorrect = false;
+            let finalUserAnswer = userAns;
 
+            if (isShowAnswer) {
+                finalUserAnswer = '';   // 未选择
+                isCorrect = false;       // 算错
+            } else {
+                isCorrect = (finalUserAnswer === correct);
+            }
+
+            answered = true;
+            const doneBook = getDoneBook();
+            const wrongBook = getWrongBook();
+            doneBook.add(q.id);
+            saveDoneBook(doneBook);
+
+            let resultHtml = '';
             if (isCorrect) {
-                resultArea.innerHTML = '<div class="result correct">✅ 回答正确！</div>';
+                resultHtml = '<div class="result correct">✅ 回答正确！</div>';
                 if (wrongBook.has(q.id)) {
                     wrongBook.delete(q.id);
                     saveWrongBook(wrongBook);
                 }
             } else {
-                resultArea.innerHTML = `<div class="result incorrect">❌ 错误，正确答案是：<b>${correct}</b></div>`;
+                resultHtml = `<div class="result incorrect">❌ 错误，正确答案是：<b>${correct}</b></div>`;
                 wrongBook.add(q.id);
                 saveWrongBook(wrongBook);
             }
-            highlightAnswer(correct);
+
+            questionStatus[q.id] = {
+                userAnswer: finalUserAnswer,
+                correctAnswer: correct,
+                isCorrect: isCorrect,
+                resultHtml: resultHtml
+            };
+
+            document.getElementById('resultArea').innerHTML = resultHtml;
+            highlightAnswer(correct, finalUserAnswer);
+            saveProgress();
             updateStats();
         }
 
-        function highlightAnswer(correct) {
-            document.querySelectorAll('.option-item').forEach(el => el.style.pointerEvents = 'none');
+        function highlightAnswer(correct, user) {
+            const allOpts = document.querySelectorAll('.option-item');
+            allOpts.forEach(el => el.style.pointerEvents = 'none');
             if (currentQuestion.type === '判断') {
                 const map = { '正确':'A', '错误':'B' };
-                const letter = map[correct] || correct;
-                document.querySelectorAll('.option-item').forEach(el => {
-                    if (el.dataset.letter === letter) el.classList.add('selected');
+                const cLetter = map[correct] || correct;
+                const uLetter = map[user] || user;
+                allOpts.forEach(el => {
+                    const letter = el.dataset.letter;
+                    if (letter === cLetter) el.classList.add('selected');
+                    else if (letter === uLetter && letter !== cLetter) el.classList.add('wrong');
                 });
             } else {
-                const letters = correct.split('');
-                document.querySelectorAll('.option-item').forEach(el => {
-                    if (letters.includes(el.dataset.letter)) el.classList.add('selected');
+                const cLetters = correct.split('');
+                const uLetters = (user || '').split('');
+                allOpts.forEach(el => {
+                    const letter = el.dataset.letter;
+                    if (cLetters.includes(letter)) el.classList.add('selected');
+                    else if (uLetters.includes(letter)) el.classList.add('wrong');
                 });
             }
         }
 
-        // ========== 下一题 ==========
-        function nextQuestion() {
-            if (!answered) {
-                alert('请先提交答案');
-                return;
-            }
-            currentQueueIndex++;
-            if (currentQueueIndex < totalToDo) {
-                currentQuestion = questionQueue[currentQueueIndex];
-                userAnswer = null;
-                answered = false;
-                renderQuestion();
-            } else {
-                // 全部做完，显示完成界面
-                document.getElementById('questionContainer').innerHTML = `
-                    <div class="finish-card">
-                        <h2>🎉 恭喜完成本轮练习！</h2>
-                        <p style="margin-top:10px;">你已做完 ${totalToDo} 道题。</p>
-                        <button onclick="startPractice()" style="margin-top:20px; padding:10px 30px; background:#2e86c1; color:white; border:none; border-radius:8px; font-size:1rem; cursor:pointer;">🔄 重新开始</button>
-                    </div>`;
-            }
+        // ========== 完成练习 ==========
+        function finishPractice() {
+            clearProgress();
+            const container = document.getElementById('questionContainer');
+
+            let gridHtml = '<div class="overview-grid">';
+            questionQueue.forEach(id => {
+                const status = questionStatus[id];
+                let cls = 'unanswered';
+                let label = '?';
+                if (status && typeof status.isCorrect === 'boolean') {
+                    cls = status.isCorrect ? 'correct-status' : 'wrong-status';
+                    label = status.isCorrect ? '✓' : '✗';
+                }
+                gridHtml += `<div class="overview-item ${cls}" onclick="jumpToQuestion(${id})">${label}</div>`;
+            });
+            gridHtml += '</div>';
+
+            container.innerHTML = `
+                <div class="finish-card">
+                    <h2>🎉 本轮练习完成！</h2>
+                    <p style="margin:10px 0;">共 ${totalToDo} 题，已完成。</p>
+                    ${gridHtml}
+                    <p style="font-size:0.8rem; color:#7f8c8d;">✓正确  ✗错误  ?未做（点击可跳转）</p>
+                    <button onclick="startPractice()" style="margin-top:15px; padding:10px 30px; background:#2e86c1; color:white; border:none; border-radius:8px; font-size:1rem; cursor:pointer;">🔄 重新开始</button>
+                </div>`;
         }
 
-        // ========== 清错题本 ==========
-        function clearWrongBook() {
-            if (confirm('确定要清空错题本吗？')) {
-                localStorage.removeItem('wrongBook');
+        function jumpToQuestion(id) {
+            const idx = questionQueue.indexOf(id);
+            if (idx === -1) return;
+            currentQueueIndex = idx;
+            totalToDo = questionQueue.length;
+            loadCurrentQuestion();
+            saveProgress();
+            document.getElementById('questionContainer').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function clearAllRecords() {
+            if (confirm('确定要清除所有错题、已做记录和当前练习进度吗？')) {
+                safeRemoveItem('wrongBook');
+                safeRemoveItem('doneBook');
+                clearProgress();
                 updateStats();
+                document.getElementById('questionContainer').innerHTML = '<div class="empty-state">✅ 所有记录已清除</div>';
+                document.getElementById('resumeArea').innerHTML = '';
             }
         }
 
         // ========== 初始化 ==========
         window.addEventListener('load', () => {
             updateStats();
+            const progress = loadProgress();
+            if (progress && progress.queue && progress.queue.length > 0) {
+                document.getElementById('resumeArea').innerHTML = `
+                    <div class="resume-prompt">
+                        <p>📌 上次做到第 <b>${progress.index + 1}</b> / ${progress.total} 题</p>
+                        <button id="resumeBtn" style="margin:5px; padding:10px 20px; background:#27ae60; color:white; border:none; border-radius:8px;">✅ 继续上次</button>
+                        <button id="discardBtn" style="margin:5px; padding:10px 20px; background:#95a5a6; color:white; border:none; border-radius:8px;">🗑 放弃进度</button>
+                    </div>`;
+                document.getElementById('resumeBtn').onclick = () => resumePractice(progress);
+                document.getElementById('discardBtn').onclick = () => {
+                    clearProgress();
+                    document.getElementById('resumeArea').innerHTML = '';
+                };
+            }
             document.getElementById('questionContainer').innerHTML = '<div class="empty-state">⬆️ 选择筛选条件，然后点「开始做题」</div>';
         });
     </script>
