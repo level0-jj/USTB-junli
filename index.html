@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>军事理论刷题 · 查看答案版</title>
+    <title>军事理论刷题 · 选项修复版</title>
     <style>
         * { margin:0; padding:0; box-sizing:border-box; }
         body {
@@ -137,7 +137,7 @@
     <div id="questionContainer"></div>
 
     <script>
-        // ★★★ 题库数据（将 questions.json 的全部内容粘贴过来替换 [ ]） ★★★
+        // ★★★ 题库数据（将 questions.json 的全部内容粘贴替换掉 [ ]） ★★★
         const allQuestions = [
   {
     "id": 1,
@@ -14519,11 +14519,9 @@
         let currentQueueIndex = 0;
         let totalToDo = 0;
         let currentQuestion = null;
-        let userAnswer = null;     // 用户选择的字母字符串
-        let answered = false;      // 当前题目是否已提交/查看答案
+        let userAnswer = null;
+        let answered = false;
         let lastTapTime = 0;
-
-        // 每题的状态存储：{ userAnswer, correctAnswer, isCorrect, resultHtml }
         let questionStatus = {};
 
         // ========== 本地存储 ==========
@@ -14563,7 +14561,6 @@
             return null;
         }
 
-        // ========== 统计 ==========
         function updateStats() {
             const total = allQuestions.length;
             const single = allQuestions.filter(q => q.type==='选择').length;
@@ -14588,6 +14585,31 @@
 
         function getQuestionById(id) {
             return allQuestions.find(q => q.id == id);
+        }
+
+        // ========== 选项拆分函数：处理合并的选项字符串 ==========
+        function normalizeOptions(rawOptions) {
+            // 如果已经是正常的数组，每个元素只包含一个选项，直接返回
+            // 但如果有任何一个元素包含多个选项，则进行拆分
+            let needSplit = false;
+            for (let opt of rawOptions) {
+                // 检测是否包含类似 "A. xxx B. xxx" 的模式
+                if (/(?:^|[^A-E])[A-E]\s*[.．、：:]\s*.+/.test(opt) && opt.match(/[A-E]\s*[.．、：:]/g).length > 1) {
+                    needSplit = true;
+                    break;
+                }
+            }
+            if (!needSplit) return rawOptions;
+
+            // 将所有选项合并成一个字符串，再按字母拆分
+            const allText = rawOptions.join(' ');
+            const pattern = /([A-E])\s*[.．、：:]\s*(.*?)(?=\s*[A-E]\s*[.．、：:]|$)/g;
+            const result = [];
+            let match;
+            while ((match = pattern.exec(allText)) !== null) {
+                result.push(match[1] + '. ' + match[2].trim());
+            }
+            return result.length >= 2 ? result : rawOptions; // 如果拆分失败，返回原始
         }
 
         // ========== 开始练习 ==========
@@ -14632,7 +14654,6 @@
             loadCurrentQuestion();
         }
 
-        // ========== 恢复进度 ==========
         function resumePractice(progress) {
             document.getElementById('resumeArea').innerHTML = '';
             questionQueue = progress.queue;
@@ -14662,7 +14683,7 @@
                 return;
             }
             const status = questionStatus[id];
-            if (status && status.isCorrect !== undefined) {
+            if (status && typeof status.isCorrect === 'boolean') {
                 answered = true;
                 userAnswer = status.userAnswer || null;
             } else {
@@ -14672,16 +14693,24 @@
             renderQuestion();
         }
 
-        // ========== 渲染 ==========
+        // ========== 渲染题目（关键修改：使用 normalizeOptions） ==========
         function renderQuestion() {
             if (!currentQuestion) return;
             const q = currentQuestion;
             const container = document.getElementById('questionContainer');
             const progressText = `第 ${currentQueueIndex + 1} / ${totalToDo} 题`;
 
+            // 规范化选项：自动分割合并的选项
+            const options = normalizeOptions(q.options);
+
             let optionsHtml = '';
-            q.options.forEach((opt, idx) => {
+            options.forEach((opt, idx) => {
                 const letter = String.fromCharCode(65 + idx);
+                // 如果 opt 字符串已经包含字母标记（如 "A. 预备役"），去除多余的前缀字母和标点，只保留文本
+                let cleanText = opt.replace(/^[A-E]\s*[.．、：:]\s*/, '').trim();
+                // 如果去除后为空，则保留原始
+                if (!cleanText) cleanText = opt;
+
                 let cls = 'option-item';
                 if (answered && userAnswer) {
                     if (q.type === '选择' || q.type === '判断') {
@@ -14690,7 +14719,7 @@
                         if (userAnswer.includes(letter)) cls += ' selected';
                     }
                 }
-                optionsHtml += `<div class="${cls}" data-letter="${letter}"><span class="option-letter">${letter}</span><span>${opt}</span></div>`;
+                optionsHtml += `<div class="${cls}" data-letter="${letter}"><span class="option-letter">${letter}</span><span>${cleanText}</span></div>`;
             });
 
             container.innerHTML = `
@@ -14708,7 +14737,6 @@
                     <div id="resultArea"></div>
                 </div>`;
 
-            // 如果已答，显示结果并禁止操作
             if (answered) {
                 const status = questionStatus[q.id];
                 if (status && status.resultHtml) {
@@ -14716,7 +14744,6 @@
                 }
                 document.querySelectorAll('.option-item').forEach(el => el.style.pointerEvents = 'none');
             } else {
-                // 绑定选项点击
                 document.querySelectorAll('.option-item').forEach(el => {
                     el.addEventListener('click', function(e) {
                         if (answered) return;
@@ -14739,7 +14766,6 @@
             }
         }
 
-        // ========== 上一题 ==========
         function prevQuestion() {
             if (currentQueueIndex > 0) {
                 saveTempState();
@@ -14764,25 +14790,21 @@
             if (!currentQuestion) return;
             const id = currentQuestion.id;
             if (!answered && userAnswer) {
-                // 有选择但未提交，暂存但不标记对错
                 questionStatus[id] = {
                     userAnswer: userAnswer,
                     correctAnswer: null,
-                    isCorrect: undefined,  // 未提交，不算完成
+                    isCorrect: undefined,
                     resultHtml: null
                 };
             }
-            // 如果已答，questionStatus 早已存在，不动
         }
 
-        // ========== 提交答案 ==========
         function submitAnswer() {
             if (!currentQuestion || answered) return;
             if (!userAnswer) { alert('请先选择答案'); return; }
             finalizeAnswer(userAnswer, false);
         }
 
-        // ========== 查看答案（算错）==========
         function showAnswer() {
             if (!currentQuestion || answered) return;
             finalizeAnswer(null, true);
@@ -14795,8 +14817,8 @@
             let finalUserAnswer = userAns;
 
             if (isShowAnswer) {
-                finalUserAnswer = '';   // 未选择
-                isCorrect = false;       // 算错
+                finalUserAnswer = '';
+                isCorrect = false;
             } else {
                 isCorrect = (finalUserAnswer === correct);
             }
@@ -14856,7 +14878,6 @@
             }
         }
 
-        // ========== 完成练习 ==========
         function finishPractice() {
             clearProgress();
             const container = document.getElementById('questionContainer');
@@ -14905,7 +14926,6 @@
             }
         }
 
-        // ========== 初始化 ==========
         window.addEventListener('load', () => {
             updateStats();
             const progress = loadProgress();
