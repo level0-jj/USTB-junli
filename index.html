@@ -101,6 +101,71 @@
         .overview-item.unanswered { background: #e0e0e0; color: #7f8c8d; }
         .overview-item.correct-status { background: #d4efdf; color: #1e8449; }
         .overview-item.wrong-status { background: #fadbd8; color: #b03a2e; }
+        .overview-item.current-preview { background: #fef9e7; color: #b7950b; border-color: #f1c40f; }
+
+        /* 考试模式样式 */
+        .exam-submit-area { margin-top: 16px; }
+        .exam-modal-overlay {
+            position: fixed; top:0; left:0; width:100%; height:100%;
+            background: rgba(0,0,0,0.5); z-index: 999;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .exam-modal {
+            background: white; border-radius: 14px; padding: 24px;
+            max-width: 90%; max-height: 80vh; overflow-y: auto;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+        }
+        .exam-modal h2 { text-align: center; margin-bottom: 16px; color: #2c3e50; }
+        .exam-score { text-align: center; font-size: 1.2rem; padding: 10px; margin-bottom: 16px; }
+        .exam-score .score-num { font-size: 2rem; font-weight: 700; color: #27ae60; }
+        .exam-score-section { margin-bottom: 12px; }
+        .exam-score-section h3 { font-size: 0.95rem; margin-bottom: 8px; color: #2c3e50; }
+        .exam-detail-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(44px, 1fr));
+            gap: 6px; margin: 8px 0;
+        }
+        .exam-detail-item {
+            width: 42px; height: 42px;
+            display: flex; align-items: center; justify-content: center;
+            border-radius: 6px; font-weight: bold; font-size: 0.8rem;
+            cursor: pointer; border: 2px solid transparent;
+        }
+        .exam-detail-item.correct-exam { background: #d4efdf; color: #1e8449; }
+        .exam-detail-item.wrong-exam { background: #fadbd8; color: #b03a2e; }
+        .exam-detail-item:hover { transform: scale(1.1); }
+        .exam-detail-item .detail-pts { font-size: 0.6rem; }
+        .exam-modal-btns { display: flex; gap: 12px; justify-content: center; margin-top: 16px; }
+        .exam-modal-btns button {
+            padding: 10px 24px; border-radius: 8px; border: none;
+            font-size: 1rem; font-weight: 600; cursor: pointer;
+        }
+        .btn-submit-exam { background: #27ae60; color: white; }
+        .btn-continue-exam { background: #e67e22; color: white; }
+
+        .mode-tab-bar {
+            display: flex; gap: 0; margin-bottom: 8px; width: 100%;
+        }
+        .mode-tab {
+            flex: 1; padding: 10px 8px; text-align: center;
+            border: 1px solid #d5d8dc; background: white;
+            font-size: 0.85rem; font-weight: 600; cursor: pointer;
+            transition: all 0.2s;
+        }
+        .mode-tab:first-child { border-radius: 8px 0 0 8px; }
+        .mode-tab:last-child { border-radius: 0 8px 8px 0; }
+        .mode-tab.active { background: #2e86c1; color: white; border-color: #2e86c1; }
+        .mode-tab.exam-active { background: #e74c3c; color: white; border-color: #e74c3c; }
+
+        .exam-indicator {
+            display: inline-block; background: #fadbd8; color: #c0392b;
+            padding: 2px 10px; border-radius: 12px; font-size: 0.75rem;
+            font-weight: 700; margin-left: 6px;
+        }
+        .preview-bar {
+            text-align: center; padding: 6px; background: #fef9e7;
+            border-radius: 8px; font-size: 0.8rem; color: #7d6608; margin-bottom: 8px;
+        }
     </style>
 </head>
 <body>
@@ -109,28 +174,40 @@
     <div class="stats" id="stats"></div>
 
     <div class="controls">
-        <select id="typeFilter">
-            <option value="all">全部题型</option>
-            <option value="选择">单选</option>
-            <option value="多选">多选</option>
-            <option value="判断">判断</option>
-        </select>
-        <select id="modeFilter">
-            <option value="all">所有题目</option>
-            <option value="unanswered">未做过的</option>
-            <option value="wrong">错题重练</option>
-        </select>
-        <select id="countSelect">
-            <option value="all">全部</option>
-            <option value="10">10 题</option>
-            <option value="20">20 题</option>
-            <option value="30">30 题</option>
-            <option value="50">50 题</option>
-            <option value="custom">自定义</option>
-        </select>
-        <input type="number" id="customCount" placeholder="输入题数" style="display:none" min="1">
-        <button onclick="startPractice()">▶️ 开始做题</button>
-        <button class="secondary" onclick="clearAllRecords()">🗑 清记录</button>
+        <div class="mode-tab-bar">
+            <div class="mode-tab active" id="practiceTab" onclick="switchMode('practice')">📖 练习模式</div>
+            <div class="mode-tab" id="examTab" onclick="switchMode('exam')">📝 考试模式</div>
+        </div>
+        <div id="practiceControls" style="display:flex; flex-wrap:wrap; gap:8px; align-items:center; width:100%;">
+            <select id="typeFilter">
+                <option value="all">全部题型</option>
+                <option value="选择">单选</option>
+                <option value="多选">多选</option>
+                <option value="判断">判断</option>
+            </select>
+            <select id="modeFilter">
+                <option value="all">所有题目</option>
+                <option value="unanswered">未做过的</option>
+                <option value="wrong">错题重练</option>
+            </select>
+            <select id="countSelect">
+                <option value="all">全部</option>
+                <option value="10">10 题</option>
+                <option value="20">20 题</option>
+                <option value="30">30 题</option>
+                <option value="50">50 题</option>
+                <option value="custom">自定义</option>
+            </select>
+            <input type="number" id="customCount" placeholder="输入题数" style="display:none" min="1">
+            <label>从第 <input type="number" id="startFrom" style="width:60px;" min="1" value="1"> 题开始</label>
+            <label><input type="checkbox" id="randomOrder"> 随机</label>
+            <button onclick="startPractice()">▶️ 开始做题</button>
+            <button class="secondary" onclick="clearAllRecords()">🗑 清记录</button>
+        </div>
+        <div id="examControls" style="display:none; flex-wrap:wrap; gap:8px; align-items:center; width:100%;">
+            <span style="font-size:0.85rem; color:#c0392b; font-weight:600;">考试模式：20单选(1分)+20多选(2分)+10判断(0.5分)，总分50分</span>
+            <button onclick="startExam()">📝 开始考试</button>
+        </div>
     </div>
 
     <div id="resumeArea"></div>
@@ -14523,6 +14600,10 @@
         let answered = false;
         let lastTapTime = 0;
         let questionStatus = {};
+        let currentMode = 'practice'; // 'practice' | 'exam'
+        let examQuestions = [];
+        let examAnswers = {};
+        let examConfirmed = false;
 
         // ========== 本地存储 ==========
         function safeGetItem(k) { try { return localStorage.getItem(k); } catch(e) { return null; } }
@@ -14587,6 +14668,367 @@
             return allQuestions.find(q => q.id == id);
         }
 
+        // ========== 模式切换 ==========
+        function switchMode(mode) {
+            currentMode = mode;
+            document.getElementById('practiceTab').className = 'mode-tab' + (mode === 'practice' ? ' active' : '');
+            document.getElementById('examTab').className = 'mode-tab' + (mode === 'exam' ? ' exam-active' : '');
+            document.getElementById('practiceControls').style.display = mode === 'practice' ? 'flex' : 'none';
+            document.getElementById('examControls').style.display = mode === 'exam' ? 'flex' : 'none';
+            if (mode === 'exam') {
+                // 退出考试模式回到练习
+            }
+            // 清空当前题目显示
+            document.getElementById('questionContainer').innerHTML = '<div class="empty-state">⬆️ 选择模式后开始做题</div>';
+            document.getElementById('resumeArea').innerHTML = '';
+            clearProgress();
+        }
+
+        // ========== 考试模式相关 ==========
+        function startExam() {
+            clearProgress();
+            // 从题库中抽取：20单选，20多选，10判断
+            const singles = allQuestions.filter(q => q.type === '选择');
+            const multis = allQuestions.filter(q => q.type === '多选');
+            const judges = allQuestions.filter(q => q.type === '判断');
+
+            function shuffle(arr) {
+                const a = [...arr];
+                for (let i = a.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [a[i], a[j]] = [a[j], a[i]];
+                }
+                return a;
+            }
+
+            const selectedSingles = shuffle(singles).slice(0, 20);
+            const selectedMultis = shuffle(multis).slice(0, 20);
+            const selectedJudges = shuffle(judges).slice(0, 10);
+
+            examQuestions = [...selectedSingles, ...selectedMultis, ...selectedJudges];
+            examAnswers = {};
+            examConfirmed = false;
+
+            questionQueue = examQuestions.map(q => q.id);
+            totalToDo = questionQueue.length;
+            currentQueueIndex = 0;
+            answered = false;
+            userAnswer = null;
+            questionStatus = {};
+
+            // 使用预览模式
+            document.getElementById('questionContainer').innerHTML = `<div class="preview-bar">📝 考试模式 · 全部答完后可提交 · 共 ${totalToDo} 题</div>`;
+            loadExamQuestion();
+        }
+
+        function loadExamQuestion() {
+            const id = questionQueue[currentQueueIndex];
+            currentQuestion = getQuestionById(id);
+            if (!currentQuestion) return;
+            const saved = examAnswers[id];
+            answered = !!saved;
+            userAnswer = saved || null;
+            renderExamQuestion();
+        }
+
+        function renderExamQuestion() {
+            if (!currentQuestion) return;
+            const q = currentQuestion;
+            const container = document.getElementById('questionContainer');
+            const progressText = `第 ${currentQueueIndex + 1} / ${totalToDo} 题`;
+
+            // 显示题号预览条
+            let previewHtml = '<div style="display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-bottom:12px;">';
+            questionQueue.forEach((qid, idx) => {
+                const hasAns = !!examAnswers[qid];
+                const isCurrent = idx === currentQueueIndex;
+                let cls = 'overview-item';
+                if (isCurrent) cls += ' current-preview';
+                else if (hasAns) cls += ' correct-status';
+                else cls += ' unanswered';
+                previewHtml += `<div class="${cls}" style="width:32px;height:32px;font-size:0.7rem;cursor:pointer;" onclick="jumpExamQuestion(${idx})">${idx + 1}</div>`;
+            });
+            previewHtml += '</div>';
+
+            const options = normalizeOptions(q.options);
+            let optionsHtml = '';
+            options.forEach((opt, idx) => {
+                const letter = String.fromCharCode(65 + idx);
+                let cleanText = opt.replace(/^[A-E]\s*[.．、：:]\s*/, '').trim();
+                if (!cleanText) cleanText = opt;
+                let cls = 'option-item';
+                if (answered && userAnswer) {
+                    if (q.type === '选择' || q.type === '判断') {
+                        if (userAnswer === letter) cls += ' selected';
+                    } else {
+                        if (userAnswer.includes(letter)) cls += ' selected';
+                    }
+                }
+                optionsHtml += `<div class="${cls}" data-letter="${letter}"><span class="option-letter">${letter}</span><span>${cleanText}</span></div>`;
+            });
+
+            const isLast = currentQueueIndex === totalToDo - 1;
+
+            container.innerHTML = `
+                ${previewHtml}
+                <div class="question-card">
+                    <div class="progress">${progressText}</div>
+                    <span class="question-type">${q.type} <span class="exam-indicator">考试</span></span>
+                    <div class="question-text">${q.id}. ${q.question}</div>
+                    <div class="options">${optionsHtml}</div>
+                    <div class="action-row" style="justify-content:space-between;">
+                        <button class="btn-prev" onclick="prevExamQuestion()">◀ 上一题</button>
+                        ${isLast ? `<button class="btn-submit-exam" style="flex:2;background:#e74c3c;color:white;border:none;border-radius:10px;font-weight:600;cursor:pointer;" onclick="showExamSubmitDialog()">📤 交卷</button>` : `<button class="btn-next" onclick="nextExamQuestion()" style="flex:2;">下一题 ▶</button>`}
+                    </div>
+                    ${isLast ? '<div style="margin-top:10px;" class="exam-submit-area"><button onclick="showExamSubmitDialog()" style="width:100%;padding:14px;background:#e74c3c;color:white;border:none;border-radius:10px;font-size:1.1rem;font-weight:700;cursor:pointer;">📤 交卷</button></div>' : ''}
+                </div>`;
+
+            if (!answered) {
+                document.querySelectorAll('.option-item').forEach(el => {
+                    el.addEventListener('click', function() {
+                        if (examConfirmed) return;
+                        const letter = this.dataset.letter;
+                        if (q.type === '选择' || q.type === '判断') {
+                            document.querySelectorAll('.option-item').forEach(opt => opt.classList.remove('selected'));
+                            this.classList.add('selected');
+                            userAnswer = letter;
+                        } else {
+                            this.classList.toggle('selected');
+                            const sel = [];
+                            document.querySelectorAll('.option-item.selected').forEach(el => sel.push(el.dataset.letter));
+                            userAnswer = sel.sort().join('');
+                        }
+                        // 自动保存答案
+                        examAnswers[q.id] = userAnswer;
+                        answered = true;
+                    });
+                });
+            }
+        }
+
+        function prevExamQuestion() {
+            if (currentQueueIndex > 0) {
+                currentQueueIndex--;
+                loadExamQuestion();
+            }
+        }
+
+        function nextExamQuestion() {
+            if (currentQueueIndex < totalToDo - 1) {
+                currentQueueIndex++;
+                loadExamQuestion();
+            }
+        }
+
+        function jumpExamQuestion(idx) {
+            if (idx >= 0 && idx < totalToDo) {
+                currentQueueIndex = idx;
+                loadExamQuestion();
+            }
+        }
+
+        function showExamSubmitDialog() {
+            const total = totalToDo;
+            const answered = Object.keys(examAnswers).length;
+            if (answered < total) {
+                if (!confirm(`还有 ${total - answered} 题未作答，确定要交卷吗？`)) return;
+            } else {
+                if (!confirm('全部题目已作答，确定要交卷吗？')) return;
+            }
+            submitExam();
+        }
+
+        function submitExam() {
+            examConfirmed = true;
+
+            // 计分
+            let singleCorrect = 0, singleTotal = 0;
+            let multiCorrect = 0, multiTotal = 0;
+            let judgeCorrect = 0, judgeTotal = 0;
+
+            let singleDetails = [], multiDetails = [], judgeDetails = [];
+
+            examQuestions.forEach((q, idx) => {
+                const userAns = examAnswers[q.id] || '';
+                const correct = q.answer;
+                let isCorrect = false;
+                if (q.type === '选择' || q.type === '判断') {
+                    isCorrect = (userAns === correct);
+                } else if (q.type === '多选') {
+                    // 多选：漏选错选均不得分
+                    isCorrect = (userAns === correct);
+                }
+
+                if (q.type === '选择') {
+                    singleTotal++;
+                    if (isCorrect) singleCorrect++;
+                    singleDetails.push({ id: q.id, index: idx, isCorrect, userAns, correct, pts: isCorrect ? 1 : 0, maxPts: 1, type: q.type });
+                } else if (q.type === '多选') {
+                    multiTotal++;
+                    if (isCorrect) multiCorrect++;
+                    multiDetails.push({ id: q.id, index: idx, isCorrect, userAns, correct, pts: isCorrect ? 2 : 0, maxPts: 2, type: q.type });
+                } else if (q.type === '判断') {
+                    judgeTotal++;
+                    if (isCorrect) judgeCorrect++;
+                    judgeDetails.push({ id: q.id, index: idx, isCorrect, userAns, correct, pts: isCorrect ? 0.5 : 0, maxPts: 0.5, type: q.type });
+                }
+            });
+
+            const singleScore = singleCorrect * 1;
+            const multiScore = multiCorrect * 2;
+            const judgeScore = judgeCorrect * 0.5;
+            const totalScore = singleScore + multiScore + judgeScore;
+
+            showExamResultModal(singleScore, singleTotal, multiScore, multiTotal, judgeScore, judgeTotal, totalScore,
+                singleDetails, multiDetails, judgeDetails);
+        }
+
+        function showExamResultModal(singleScore, singleTotal, multiScore, multiTotal, judgeScore, judgeTotal, totalScore,
+            singleDetails, multiDetails, judgeDetails) {
+
+            function makeDetailGrid(details, maxPts) {
+                let html = '<div class="exam-detail-grid">';
+                details.forEach(d => {
+                    const cls = d.isCorrect ? 'correct-exam' : 'wrong-exam';
+                    html += `<div class="exam-detail-item ${cls}" onclick="jumpExamQuestion(${d.index})" title="题${d.id}: ${d.isCorrect ? '✓' : '✗'} (${d.pts}/${d.maxPts}分)">${questionQueue.indexOf(d.id) + 1}<span class="detail-pts">${d.pts}</span></div>`;
+                });
+                html += '</div>';
+                return html;
+            }
+
+            const overlay = document.createElement('div');
+            overlay.className = 'exam-modal-overlay';
+            overlay.innerHTML = `
+                <div class="exam-modal">
+                    <h2>📊 考试成绩</h2>
+                    <div class="exam-score">
+                        总分：<span class="score-num">${totalScore}</span> / 50 分
+                    </div>
+                    <div class="exam-score-section">
+                        <h3>📌 单选题（共 ${singleTotal} 题，每题1分）— 得分：${singleScore} / ${singleTotal}</h3>
+                        ${makeDetailGrid(singleDetails)}
+                    </div>
+                    <div class="exam-score-section">
+                        <h3>📌 多选题（共 ${multiTotal} 题，每题2分）— 得分：${multiScore} / ${multiTotal * 2}</h3>
+                        ${makeDetailGrid(multiDetails)}
+                    </div>
+                    <div class="exam-score-section">
+                        <h3>📌 判断题（共 ${judgeTotal} 题，每题0.5分）— 得分：${judgeScore} / ${judgeTotal * 0.5}</h3>
+                        ${makeDetailGrid(judgeDetails)}
+                    </div>
+                    <p style="text-align:center;font-size:0.85rem;color:#7f8c8d;margin:8px 0;">
+                        ✅ 绿色=正确 · ❌ 红色=错误 · 点击题号可跳转查看
+                    </p>
+                    <div class="exam-modal-btns">
+                        <button class="btn-continue-exam" onclick="closeExamModal(true)">🔍 查看错题</button>
+                        <button class="btn-submit-exam" onclick="closeExamModal(false)">✅ 完成</button>
+                    </div>
+                </div>`;
+            document.body.appendChild(overlay);
+        }
+
+        let examModalOpen = false;
+
+        function closeExamModal(showWrong) {
+            const overlay = document.querySelector('.exam-modal-overlay');
+            if (overlay) overlay.remove();
+            examModalOpen = false;
+
+            if (showWrong) {
+                // 跳转到第一个错题
+                for (let i = 0; i < examQuestions.length; i++) {
+                    const q = examQuestions[i];
+                    const userAns = examAnswers[q.id] || '';
+                    const correct = q.answer;
+                    let isCorrect = (q.type === '多选') ? (userAns === correct) : (userAns === correct);
+                    if (!isCorrect) {
+                        currentQueueIndex = i;
+                        loadExamReviewQuestion();
+                        return;
+                    }
+                }
+            }
+            // 回到开始
+            document.getElementById('questionContainer').innerHTML = '<div class="empty-state">📝 考试已完成</div>';
+        }
+
+        function loadExamReviewQuestion() {
+            const id = questionQueue[currentQueueIndex];
+            currentQuestion = getQuestionById(id);
+            if (!currentQuestion) return;
+            const q = currentQuestion;
+            const container = document.getElementById('questionContainer');
+            const progressText = `第 ${currentQueueIndex + 1} / ${totalToDo} 题`;
+
+            let previewHtml = '<div style="display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-bottom:12px;">';
+            questionQueue.forEach((qid, idx) => {
+                const qq = examQuestions.find(ex => ex.id === qid);
+                const ua = examAnswers[qid] || '';
+                const ca = qq ? qq.answer : '';
+                let isC = false;
+                if (qq) {
+                    if (qq.type === '多选') isC = (ua === ca);
+                    else isC = (ua === ca);
+                }
+                let cls = 'overview-item';
+                if (idx === currentQueueIndex) cls += ' current-preview';
+                else if (isC) cls += ' correct-status';
+                else cls += ' wrong-status';
+                previewHtml += `<div class="${cls}" style="width:32px;height:32px;font-size:0.7rem;cursor:pointer;" onclick="jumpExamReview(${idx})">${idx + 1}</div>`;
+            });
+            previewHtml += '</div>';
+
+            const options = normalizeOptions(q.options);
+            let optionsHtml = '';
+            const userAns = examAnswers[q.id] || '';
+            const correct = q.answer;
+            const mapJudgment = { '正确':'A', '错误':'B' };
+            const cStr = (q.type === '判断' && correct.length > 1) ? mapJudgment[correct] || correct : correct;
+            const uStr = (q.type === '判断' && userAns.length > 1) ? mapJudgment[userAns] || userAns : userAns;
+
+            options.forEach((opt, idx) => {
+                const letter = String.fromCharCode(65 + idx);
+                let cleanText = opt.replace(/^[A-E]\s*[.．、：:]\s*/, '').trim();
+                if (!cleanText) cleanText = opt;
+                let cls = 'option-item';
+                // 标记正确选项
+                if (cStr.includes(letter)) cls += ' selected';
+                // 如果用户选了错误选项，标记为wrong
+                if (uStr && !cStr.includes(letter) && uStr.includes(letter)) cls += ' wrong';
+                // 如果用户没选正确选项（漏选），正确选项仍需显示为selected但用特殊标记
+                if (q.type === '多选' && uStr && !uStr.includes(letter) && cStr.includes(letter)) cls += ' selected';
+
+                optionsHtml += `<div class="${cls}" data-letter="${letter}"><span class="option-letter">${letter}</span><span>${cleanText}</span></div>`;
+            });
+
+            const isCorrect = (q.type === '多选') ? (uStr === cStr) : (uStr === cStr);
+            const pts = q.type === '选择' ? (isCorrect ? 1 : 0) : q.type === '多选' ? (isCorrect ? 2 : 0) : (isCorrect ? 0.5 : 0);
+            const maxPts = q.type === '选择' ? 1 : q.type === '多选' ? 2 : 0.5;
+
+            container.innerHTML = `
+                ${previewHtml}
+                <div class="question-card">
+                    <div class="progress">${progressText}</div>
+                    <span class="question-type">${q.type}</span>
+                    <div class="result ${isCorrect ? 'correct' : 'incorrect'}" style="margin-bottom:10px;">
+                        ${isCorrect ? '✅ 正确' : '❌ 错误'} · 得分：${pts}/${maxPts}分
+                    </div>
+                    <div class="question-text">${q.id}. ${q.question}</div>
+                    <div class="options" style="pointer-events:none;">${optionsHtml}</div>
+                    <div class="action-row" style="justify-content:space-between;">
+                        <button class="btn-prev" onclick="jumpExamReview(${currentQueueIndex - 1})" ${currentQueueIndex <= 0 ? 'disabled' : ''}>◀ 上一题</button>
+                        <button class="btn-next" onclick="jumpExamReview(${currentQueueIndex + 1})" ${currentQueueIndex >= totalToDo - 1 ? 'disabled' : ''}>下一题 ▶</button>
+                    </div>
+                </div>`;
+        }
+
+        function jumpExamReview(idx) {
+            if (idx >= 0 && idx < totalToDo) {
+                currentQueueIndex = idx;
+                loadExamReviewQuestion();
+            }
+        }
+
         // ========== 选项拆分函数：处理合并的选项字符串 ==========
         function normalizeOptions(rawOptions) {
             // 如果已经是正常的数组，每个元素只包含一个选项，直接返回
@@ -14612,17 +15054,23 @@
             return result.length >= 2 ? result : rawOptions; // 如果拆分失败，返回原始
         }
 
-        // ========== 开始练习 ==========
+        // ========== 开始练习（支持自定义起始题号和随机） ==========
         function startPractice() {
             clearProgress();
             document.getElementById('resumeArea').innerHTML = '';
 
             const type = document.getElementById('typeFilter').value;
             const mode = document.getElementById('modeFilter').value;
+            const randomOrder = document.getElementById('randomOrder').checked;
+            const startFrom = parseInt(document.getElementById('startFrom').value, 10) || 1;
             const doneBook = getDoneBook();
             const wrongBook = getWrongBook();
 
             let pool = allQuestions.filter(q => type === 'all' ? true : q.type === type);
+
+            // 应用起始题号
+            pool = pool.filter(q => q.id >= startFrom);
+
             if (mode === 'wrong') pool = pool.filter(q => wrongBook.has(q.id));
             else if (mode === 'unanswered') pool = pool.filter(q => !doneBook.has(q.id));
 
@@ -14631,7 +15079,16 @@
                 return;
             }
 
-            pool.sort((a, b) => a.id - b.id);
+            if (randomOrder) {
+                // Fisher-Yates shuffle
+                for (let i = pool.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [pool[i], pool[j]] = [pool[j], pool[i]];
+                }
+            } else {
+                pool.sort((a, b) => a.id - b.id);
+            }
+
             let count;
             const countSelect = document.getElementById('countSelect');
             if (countSelect.value === 'all') count = pool.length;
@@ -14713,10 +15170,17 @@
 
                 let cls = 'option-item';
                 if (answered && userAnswer) {
+                    const correct = q.answer;
                     if (q.type === '选择' || q.type === '判断') {
-                        if (userAnswer === letter) cls += ' selected';
+                        // 正确选项标记为绿色
+                        if (correct === letter) cls += ' selected';
+                        // 用户选错的选项标记为红色
+                        if (userAnswer === letter && userAnswer !== correct) cls += ' wrong';
                     } else {
-                        if (userAnswer.includes(letter)) cls += ' selected';
+                        // 多选：正确选项标记为绿色
+                        if (correct.includes(letter)) cls += ' selected';
+                        // 用户选错（选了不在正确答案中的选项）标记为红色
+                        if (userAnswer.includes(letter) && !correct.includes(letter)) cls += ' wrong';
                     }
                 }
                 optionsHtml += `<div class="${cls}" data-letter="${letter}"><span class="option-letter">${letter}</span><span>${cleanText}</span></div>`;
